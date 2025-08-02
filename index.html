@@ -1,261 +1,259 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Description Generator</title>
-    <!-- Use Tailwind CSS for a modern and responsive design -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Custom styles for the app container */
-        body {
-            background-color: #1b1c2b; /* Dark navy background */
-            font-family: 'Inter', sans-serif;
-            color: #a0a3a7; /* Light gray text for contrast */
-            /* Use flexbox for vertical and horizontal centering */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        #app-container {
-            max-width: 960px;
-            width: 100%;
-            padding: 2rem;
-            background-color: #2d2e3a; /* Slightly lighter dark background for the card */
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            border-radius: 1rem;
-        }
-        textarea, input {
-            resize: vertical;
-            background-color: #3b3c4f; /* Darker input background */
-            color: white;
-            border-color: #55576a;
-        }
-        h1 {
-            color: #7f5af0; /* Vibrant purple for the title */
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YouTube Description Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0d1117; }
+    /* Custom style for file input */
+    input[type="file"]::file-selector-button {
+      background-color: #4b5563; /* Tailwind gray-600 */
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    input[type="file"]::file-selector-button:hover {
+      background-color: #374151; /* Tailwind gray-700 */
+    }
+  </style>
 </head>
 <body>
-<input type="password" id="apiKey" class="mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" placeholder="AIzaSyC3m6k8ONG67lMr3YMEGT4svIWaYxig-BY">
-    <div id="app-container">
-        <h1 class="text-4xl font-bold text-center mb-6">YouTube Description Generator</h1>
-        <p class="text-center mb-8">Quickly generate 5 engaging YouTube descriptions with a title and keywords.</p>
+  <div id="app"></div>
 
-        <!-- Input Form Section -->
-        <div class="space-y-4"> <!-- Reduced spacing here from space-y-6 to space-y-4 -->
-            <div>
-                <label for="apiKey" class="block text-sm font-medium">Google API Key</label>
-                <input type="password" id="apiKey" class="mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" placeholder="Enter your Google API Key here">
+  <script>
+    // The API key is left as an empty string to be filled by the environment
+    const apiKey = "AIzaSyC3m6k8ONG67lMr3YMEGT4svIWaYxig-BY";
+    
+    // Global state variables for the application
+    let appState = {
+      title: "",
+      primaryKeyword: "",
+      secondaryKeywords: ["", "", "", "", ""],
+      descriptions: [],
+      loading: false,
+      error: ""
+    };
+
+    /**
+     * Helper function to copy text to the clipboard.
+     * Uses the document.execCommand() method as recommended for this environment.
+     * @param {string} text - The text to be copied.
+     */
+    const copyToClipboard = text => {
+      const temp = document.createElement("textarea");
+      temp.value = text;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand("copy");
+      document.body.removeChild(temp);
+    };
+
+    /**
+     * Generates the SVG for a loading spinner.
+     * @returns {string} The SVG string.
+     */
+    const spinner = () => `
+      <svg class="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>`;
+
+    /**
+     * Renders the entire application UI based on the current appState.
+     */
+    const render = () => {
+      const app = document.getElementById("app");
+      const { title, primaryKeyword, secondaryKeywords, descriptions, loading, error } = appState;
+
+      app.innerHTML = `
+        <div class="min-h-screen bg-gray-900 text-white p-4 sm:p-8 flex justify-center">
+          <div class="bg-gray-800 p-6 sm:p-10 rounded-xl shadow-2xl w-full max-w-4xl">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-center mb-6 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
+              YouTube Description Generator ✍️
+            </h1>
+            <p class="text-center text-gray-400 mb-6">Fill in the details below to generate SEO-friendly video descriptions</p>
+
+            <!-- YouTube Title -->
+            <div class="mb-4">
+              <label for="title-input" class="block mb-2 text-gray-300 font-bold">YouTube Video Title</label>
+              <input id="title-input" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500" value="${title}" placeholder="e.g. Best AI Tools for Students in 2025" />
             </div>
 
-            <div>
-                <label for="youtubeTitle" class="block text-sm font-medium">YouTube Title</label>
-                <textarea id="youtubeTitle" rows="2" class="mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"></textarea>
+            <!-- Primary Keyword -->
+            <div class="mb-4">
+              <label for="primary-keyword-input" class="block mb-2 text-gray-300 font-bold">Primary Keyword</label>
+              <input id="primary-keyword-input" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500" value="${primaryKeyword}" placeholder="Required keyword e.g. AI tools" />
             </div>
 
-            <div>
-                <label for="primaryKeyword" class="block text-sm font-medium">Primary Keyword</label>
-                <input type="text" id="primaryKeyword" class="mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border">
-            </div>
-            
-            <div>
-                <label for="secondaryKeywords" class="block text-sm font-medium">Secondary Keywords (up to 5, separated by commas)</label>
-                <textarea id="secondaryKeywords" rows="2" class="mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border" placeholder="e.g., video editing, cinematic looks, sound design"></textarea>
+            <!-- Secondary Keywords -->
+            <div class="mb-6">
+              <label class="block mb-2 text-gray-300 font-bold">Secondary Keywords (Optional - Max 5)</label>
+              ${secondaryKeywords.map((kw, i) => `
+                <input id="secondary-keyword-input-${i}" class="w-full mb-2 p-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 secondary-keyword" data-index="${i}" value="${kw}" placeholder="Secondary Keyword ${i + 1}" />
+              `).join('')}
             </div>
 
-            <button id="generateBtn" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-[#7f5af0] hover:bg-[#6849d4] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
-                Generate Descriptions
+            <!-- Generate Button -->
+            <button id="generateBtn" ${loading ? "disabled" : ""}
+              class="w-full p-4 rounded-lg font-bold text-white transition-all
+              ${loading
+                ? 'bg-gray-600 cursor-not-allowed'
+                : 'bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 transform hover:scale-105'}">
+              ${loading ? spinner() : "Generate Descriptions"}
             </button>
-            <div id="loading" class="text-center text-gray-400 font-medium hidden">Generating descriptions...</div>
-        </div>
 
-        <!-- Output Section for Descriptions -->
-        <div id="resultsContainer" class="mt-12 space-y-8">
-            <!-- Descriptions will be injected here -->
-        </div>
+            ${error ? `<p class="text-red-400 text-center mt-4 text-sm">${error}</p>` : ""}
 
-    </div>
+            <!-- Output Descriptions -->
+            ${descriptions.length > 0
+              ? `<div class="mt-8">
+                  <h2 class="text-2xl text-center text-gray-200 mb-4 font-bold">Generated Descriptions</h2>
+                  <div class="space-y-4">
+                    ${descriptions.map((desc, index) => `
+                      <div class="bg-gray-700 p-4 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <p class="text-white mb-2 sm:mb-0 whitespace-pre-line flex-grow">${desc}</p>
+                        <button class="copy-btn bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-semibold flex-shrink-0" data-index="${index}">
+                          Copy
+                        </button>
+                      </div>`).join('')}
+                  </div>
+                </div>`
+              : ""}
+          </div>
+        </div>`;
+      
+      // After rendering, attach event listeners to the new elements
+      addEventListeners();
+    };
 
-    <!-- The core JavaScript logic -->
-    <script>
-        // Set up global variables
-        const apiKeyInput = document.getElementById('apiKey');
-        const generateBtn = document.getElementById('generateBtn');
-        const loadingDiv = document.getElementById('loading');
-        const resultsContainer = document.getElementById('resultsContainer');
-        const youtubeTitleInput = document.getElementById('youtubeTitle');
-        const primaryKeywordInput = document.getElementById('primaryKeyword');
-        const secondaryKeywordsInput = document.getElementById('secondaryKeywords');
+    /**
+     * Attaches event listeners to the rendered DOM elements.
+     */
+    const addEventListeners = () => {
+      // Input listeners
+      document.getElementById("title-input").oninput = e => {
+        appState.title = e.target.value;
+      };
+      document.getElementById("primary-keyword-input").oninput = e => {
+        appState.primaryKeyword = e.target.value;
+      };
+      document.querySelectorAll(".secondary-keyword").forEach(input => {
+        input.oninput = e => {
+          appState.secondaryKeywords[parseInt(e.target.dataset.index)] = e.target.value;
+        };
+      });
 
-        // Main event listener for the button click
-        generateBtn.addEventListener('click', async () => {
-            const apiKey = apiKeyInput.value.trim();
-            const title = youtubeTitleInput.value.trim();
-            const primaryKeyword = primaryKeywordInput.value.trim();
-            const secondaryKeywords = secondaryKeywordsInput.value.trim();
+      // Generate button listener
+      document.getElementById("generateBtn").onclick = generateDescriptions;
+      
+      // Copy buttons listener
+      document.querySelectorAll(".copy-btn").forEach(btn => {
+        btn.onclick = () => {
+          const index = parseInt(btn.dataset.index);
+          copyToClipboard(appState.descriptions[index]);
+          // Add a temporary visual feedback for copying
+          const originalText = btn.textContent;
+          btn.textContent = "Copied!";
+          setTimeout(() => {
+            btn.textContent = originalText;
+          }, 1500);
+        };
+      });
+    };
 
-            // Input validation
-            if (!apiKey) {
-                alertUser('Please enter your Google API Key.');
-                return;
-            }
-            if (!title || !primaryKeyword) {
-                alertUser('Please provide a YouTube Title and a Primary Keyword.');
-                return;
-            }
+    /**
+     * Calls the Gemini API to generate descriptions based on the input keywords.
+     */
+    const generateDescriptions = async () => {
+      // Input validation
+      if (!appState.primaryKeyword.trim()) {
+        appState.error = "Primary keyword is required.";
+        render();
+        return;
+      }
 
-            // Show loading state
-            toggleLoading(true);
-            resultsContainer.innerHTML = ''; // Clear previous results
+      // Update state for loading and reset previous results
+      appState.loading = true;
+      appState.error = "";
+      appState.descriptions = [];
+      render();
 
-            try {
-                // Construct the prompt for the generative model
-                const prompt = `
-                Act as a professional YouTube description writer. Your goal is to create 5 unique, engaging, and SEO-friendly video descriptions.
-                Each description should be between 100 and 120 words long.
-                
-                Video Title: "${title}"
-                Primary Keyword: "${primaryKeyword}"
-                Secondary Keywords: "${secondaryKeywords}"
-                
-                For each description, please:
-                1. Naturally incorporate the primary and secondary keywords.
-                2. Be compelling and informative.
-                3. Do not include a title, just the description text.
-                4. Start each description with "Description 1:", "Description 2:", and so on.
-                
-                Return the 5 descriptions as a single block of text.
-                `;
+      const filteredSecondaries = appState.secondaryKeywords.filter(k => k.trim());
+      const prompt = `
+        Generate a JSON array of 3 unique YouTube video descriptions.
+        Each description should:
+        - Be between 100 to 120 words.
+        - Start with an attention-grabbing hook.
+        - Include the exact primary keyword: "${appState.primaryKeyword}".
+        - Include as many of the following secondary keywords as naturally possible: ${filteredSecondaries.join(", ") || "None"}.
+        - Explain what the video offers in 2 sentences.
+        - Contain 1 strong call-to-action.
+        - End with 2-3 trending and relevant hashtags.
+        - Do NOT include the title in the output. Just the descriptions.
+      `;
+      
+      const payload = {
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: { type: "ARRAY", items: { type: "STRING" } }
+        }
+      };
 
-                // Set up the API call payload
-                let chatHistory = [];
-                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
-                const payload = { contents: chatHistory };
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+      try {
+        let response;
+        let attempts = 0;
+        const maxAttempts = 3;
+        const baseDelay = 1000; // 1 second
 
-                let retryCount = 0;
-                let maxRetries = 3;
-                let delay = 1000; // 1 second
-
-                // Implement exponential backoff for API retries
-                while (retryCount < maxRetries) {
-                    try {
-                        const response = await fetch(apiUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-
-                        if (response.status === 429) {
-                            // Too many requests, retry with delay
-                            retryCount++;
-                            if (retryCount < maxRetries) {
-                                await new Promise(resolve => setTimeout(resolve, delay));
-                                delay *= 2; // Exponential backoff
-                                continue;
-                            } else {
-                                throw new Error('Too many requests. Please try again later.');
-                            }
-                        }
-
-                        if (!response.ok) {
-                            throw new Error(`API request failed with status: ${response.status}`);
-                        }
-
-                        const result = await response.json();
-                        
-                        if (result.candidates && result.candidates.length > 0 &&
-                            result.candidates[0].content && result.candidates[0].content.parts &&
-                            result.candidates[0].content.parts.length > 0) {
-                            const text = result.candidates[0].content.parts[0].text;
-                            displayDescriptions(text);
-                            break; // Exit the loop on success
-                        } else {
-                            throw new Error('Unexpected API response structure.');
-                        }
-                    } catch (error) {
-                        if (retryCount >= maxRetries) {
-                            throw error;
-                        }
-                        retryCount++;
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        delay *= 2;
-                    }
-                }
-
-            } catch (error) {
-                console.error('Error generating descriptions:', error);
-                
-                let userMessage = 'An unexpected error occurred. Please try again.';
-                // Provide more specific error messages to the user
-                if (error.message.includes('400')) {
-                    userMessage = 'Invalid request. Please check your input fields.';
-                } else if (error.message.includes('403') || error.message.includes('401')) {
-                    userMessage = 'The provided API key is invalid or not authorized. Please check your API key.';
-                } else if (error.message.includes('Too many requests')) {
-                    userMessage = 'You have made too many requests. Please try again later.';
-                }
-
-                alertUser(userMessage);
-
-            } finally {
-                // Hide loading state
-                toggleLoading(false);
-            }
-        });
-
-        /**
-         * Parses the API response and displays the descriptions.
-         * @param {string} rawText - The raw text from the API, containing the 5 descriptions.
-         */
-        function displayDescriptions(rawText) {
-            const descriptions = rawText.split(/Description \d+:/).filter(Boolean);
-            
-            descriptions.forEach((desc, index) => {
-                const descDiv = document.createElement('div');
-                descDiv.classList.add('p-6', 'bg-[#3b3c4f]', 'rounded-lg', 'shadow-md', 'border', 'border-[#55576a]', 'text-[#a0a3a7]');
-                descDiv.innerHTML = `
-                    <h3 class="font-bold text-lg text-[#7f5af0] mb-2">Description ${index + 1}</h3>
-                    <p class="whitespace-pre-wrap">${desc.trim()}</p>
-                `;
-                resultsContainer.appendChild(descDiv);
+        // Implement exponential backoff for API calls
+        while (attempts < maxAttempts) {
+          try {
+            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
             });
-        }
 
-        /**
-         * Toggles the loading state of the UI.
-         * @param {boolean} isLoading - True to show loading, false to hide.
-         */
-        function toggleLoading(isLoading) {
-            if (isLoading) {
-                generateBtn.disabled = true;
-                generateBtn.classList.add('bg-[#6849d4]', 'cursor-not-allowed');
-                loadingDiv.classList.remove('hidden');
-            } else {
-                generateBtn.disabled = false;
-                generateBtn.classList.remove('bg-[#6849d4]', 'cursor-not-allowed');
-                generateBtn.classList.add('bg-[#7f5af0]');
-                loadingDiv.classList.add('hidden');
+            if (response.status === 429) { // Too Many Requests
+              const delay = baseDelay * Math.pow(2, attempts);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              attempts++;
+              continue; // Retry the request
             }
-        }
 
-        /**
-         * Displays a custom alert message to the user.
-         * @param {string} message - The message to display.
-         */
-        function alertUser(message) {
-            const alertDiv = document.createElement('div');
-            alertDiv.classList.add('fixed', 'inset-0', 'flex', 'items-center', 'justify-center', 'bg-black', 'bg-opacity-50', 'z-50');
-            alertDiv.innerHTML = `
-                <div class="bg-[#2d2e3a] p-6 rounded-lg shadow-xl max-w-sm mx-auto text-[#a0a3a7]">
-                    <p class="text-center mb-4">${message}</p>
-                    <button onclick="this.parentElement.parentElement.remove()" class="w-full py-2 px-4 bg-[#7f5af0] text-white rounded-md hover:bg-[#6849d4]">OK</button>
-                </div>
-            `;
-            document.body.appendChild(alertDiv);
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const json = await response.json();
+            const content = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+            const parsed = JSON.parse(content);
+            appState.descriptions = Array.isArray(parsed) ? parsed : [];
+            break; // Exit the loop on success
+          } catch (e) {
+            console.error("API call error:", e);
+            appState.error = "Something went wrong with the API call. Try again later.";
+            break; // Exit the loop on other errors
+          }
         }
-    </script>
+      } catch (e) {
+        console.error("Fetch failed:", e);
+        appState.error = "Something went wrong. Please check your network connection.";
+      }
+
+      // Reset loading state and re-render the UI with new data
+      appState.loading = false;
+      render();
+    };
+
+    // Initial render when the page loads
+    render();
+  </script>
 </body>
 </html>
